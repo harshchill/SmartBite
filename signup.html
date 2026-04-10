@@ -91,11 +91,11 @@ Already have account?
 
 <script>
 
-function signup(){
+async function signup(){
 
-let name = document.getElementById("name").value;
-let mobile = document.getElementById("mobile").value;
-let email = document.getElementById("email").value;
+let name = document.getElementById("name").value.trim();
+let mobile = document.getElementById("mobile").value.trim();
+let email = document.getElementById("email").value.trim();
 let pass = document.getElementById("pass").value;
 let rpass = document.getElementById("rpass").value;
 
@@ -109,19 +109,26 @@ alert("Passwords do not match");
 return;
 }
 
+try{
+const response = await fetch("/api/auth/signup", {
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body: JSON.stringify({ name:name, mobile:mobile, email:email, password:pass })
+});
 
-let account = {
-name:name,
-mobile:mobile,
-email:email,
-password:pass
-};
+const data = await response.json();
 
-localStorage.setItem("account", JSON.stringify(account));
+if(!response.ok){
+alert(data.message || "Signup failed");
+return;
+}
 
 alert("Account Created Successfully 🎉");
-
 window.location = "login.html";
+
+}catch(error){
+alert("Unable to connect to server");
+}
 }
 
 </script>

@@ -88,26 +88,35 @@ No account?
 
 <script>
 
-function login(){
+async function login(){
 
-let account = JSON.parse(localStorage.getItem("account"));
+let email = luser.value.trim();
+let password = lpass.value;
 
-if(!account){
-alert("No account found. Please sign up first.");
+if(!email || !password){
+alert("Enter email and password");
 return;
 }
 
+try{
+const response = await fetch("/api/auth/login", {
+method:"POST",
+headers:{"Content-Type":"application/json"},
+body: JSON.stringify({ email: email, password: password })
+});
 
-if(luser.value == account.email && lpass.value == account.password){
+const data = await response.json();
 
+if(!response.ok){
+alert(data.message || "Login failed");
+return;
+}
 
-localStorage.setItem("user", account.name);
-
-
+localStorage.setItem("user", JSON.stringify(data.user));
 window.location = "index.html";
 
-}else{
-alert("Wrong Email or Password");
+}catch(error){
+alert("Unable to connect to server");
 }
 }
 </script>

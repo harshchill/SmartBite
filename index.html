@@ -231,7 +231,14 @@ text-align:center;
 </div>
 <script>
    
-let user = localStorage.getItem("user");
+let rawUser = localStorage.getItem("user");
+let user = null;
+
+try{
+user = rawUser ? JSON.parse(rawUser) : null;
+}catch(error){
+user = rawUser ? { name: rawUser } : null;
+}
 
 if(!user){
 window.location = "login.html";
@@ -239,7 +246,7 @@ window.location = "login.html";
 else{
 let w = document.getElementById("welcome");
 if(w){
-w.innerText = "Welcome " + user + " 👋";
+w.innerText = "Welcome " + (user.name || "User") + " 👋";
 }
 }
 
@@ -267,9 +274,6 @@ let foods = [
 let offerActive = false;
 
 window.onload = function(){
-
-// Reset cart every refresh
-localStorage.removeItem("cart");
 
 updateCartCount();
 loadMenu();
@@ -415,7 +419,7 @@ updateCartCount();
 }
 
 
-function confirmOrder(){
+async function confirmOrder(){
 
 let name = oname.value;
 let mobile = omobile.value;
@@ -428,24 +432,39 @@ return;
 
 let cart = JSON.parse(localStorage.getItem("cart")) || [];
 
-let order = {
-id: Date.now(),
+if(!cart.length){
+alert("Cart is empty");
+return;
+}
+
+try{
+const response = await fetch("/api/orders", {
+method: "POST",
+headers: {"Content-Type": "application/json"},
+body: JSON.stringify({
+userId: user && user.id ? user.id : null,
 name: name,
 mobile: mobile,
 address: address,
-items: cart,
-date: new Date().toLocaleString()
-};
+items: cart
+})
+});
 
-let orders = JSON.parse(localStorage.getItem("orders")) || [];
-orders.push(order);
-localStorage.setItem("orders", JSON.stringify(orders));
+const data = await response.json();
+
+if(!response.ok){
+alert(data.message || "Order placement failed");
+return;
+}
 
 alert("Order Placed Successfully 🎉");
-
 localStorage.removeItem("cart");
 closeOrder();
 updateCartCount();
+
+}catch(error){
+alert("Unable to connect to server");
+}
 }
 
 

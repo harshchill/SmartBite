@@ -38,21 +38,56 @@ border-left:6px solid #ff5722;
 
 <script>
 
-let orders = JSON.parse(localStorage.getItem("orders")) || [];
+async function loadHistory(){
+let rawUser = localStorage.getItem("user");
+let user = null;
+
+try{
+user = rawUser ? JSON.parse(rawUser) : null;
+}catch(error){
+user = null;
+}
+
+if(!user || !user.id){
+document.getElementById("orderList").innerHTML = "Please login to view your order history.";
+return;
+}
+
+try{
+const response = await fetch(`/api/orders?userId=${encodeURIComponent(user.id)}`);
+const orders = await response.json();
+
+if(!response.ok){
+document.getElementById("orderList").innerHTML = "Unable to load orders.";
+return;
+}
+
+if(!orders.length){
+document.getElementById("orderList").innerHTML = "No orders found.";
+return;
+}
 
 let html="";
 
 orders.forEach(o=>{
 html += `
 <div class="order">
-<b>${o.name}</b> — ${o.date}
+<b>${o.name}</b> — ${new Date(o.date).toLocaleString()}
 <p>📱 ${o.mobile}</p>
 <p>📍 ${o.address}</p>
 <p>Items: ${o.items.length}</p>
+<p>Status: ${o.status}</p>
 </div>`;
 });
 
 document.getElementById("orderList").innerHTML = html;
+
+}catch(error){
+document.getElementById("orderList").innerHTML = "Unable to connect to server.";
+}
+}
+
+loadHistory();
 
 </script>
 
