@@ -109,6 +109,11 @@ alert("Passwords do not match");
 return;
 }
 
+if(!/^[0-9]{10}$/.test(mobile)){
+alert("Enter a valid 10-digit mobile number");
+return;
+}
+
 try{
 const response = await fetch("/api/auth/signup", {
 method:"POST",

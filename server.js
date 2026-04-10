@@ -1,6 +1,8 @@
 const path = require('path');
 const crypto = require('crypto');
+const { promisify } = require('util');
 const express = require('express');
+const rateLimit = require('express-rate-limit');
 const mongoose = require('mongoose');
 const cors = require('cors');
 require('dotenv').config();
@@ -8,10 +10,22 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/smartbite';
+const scryptAsync = promisify(crypto.scrypt);
 
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname)));
+
+const apiRateLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  limit: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `${req.ip}:${req.originalUrl}`,
+  message: { message: 'Too many requests. Please try again later.' }
+});
+
+app.use('/api', apiRateLimiter);
 
 const userSchema = new mongoose.Schema(
   {
@@ -47,8 +61,9 @@ const orderSchema = new mongoose.Schema(
 const User = mongoose.model('User', userSchema);
 const Order = mongoose.model('Order', orderSchema);
 
-function hashPassword(password, salt) {
-  return crypto.scryptSync(password, salt, 64).toString('hex');
+async function hashPassword(password, salt) {
+  const derived = await scryptAsync(password, salt, 64);
+  return derived.toString('hex');
 }
 
 app.post('/api/auth/signup', async (req, res) => {
@@ -65,7 +80,7 @@ app.post('/api/auth/signup', async (req, res) => {
     }
 
     const salt = crypto.randomBytes(16).toString('hex');
-    const passwordHash = hashPassword(password, salt);
+    const passwordHash = await hashPassword(password, salt);
 
     const user = await User.create({ name, mobile, email, passwordHash, passwordSalt: salt });
 
@@ -91,7 +106,7 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(401).json({ message: 'Invalid email or password.' });
     }
 
-    const incomingHash = hashPassword(password, user.passwordSalt);
+    const incomingHash = await hashPassword(password, user.passwordSalt);
     if (incomingHash !== user.passwordHash) {
       return res.status(401).json({ message: 'Invalid email or password.' });
     }
@@ -113,7 +128,12 @@ app.post('/api/orders', async (req, res) => {
       return res.status(400).json({ message: 'Invalid order payload.' });
     }
 
-    const order = await Order.create({ userId: userId || undefined, name, mobile, address, items, status: 'Pending' });
+    if (userId && !mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ message: 'Invalid user ID.' });
+    }
+
+    const normalizedUserId = userId ? new mongoose.Types.ObjectId(userId) : undefined;
+    const order = await Order.create({ userId: normalizedUserId, name, mobile, address, items, status: 'Pending' });
 
     res.status(201).json({
       message: 'Order placed successfully.',
@@ -136,7 +156,11 @@ app.post('/api/orders', async (req, res) => {
 app.get('/api/orders', async (req, res) => {
   try {
     const { userId } = req.query;
-    const filter = userId ? { userId } : {};
+    if (userId && !mongoose.Types.ObjectId.isValid(userId)) {
+      return res.status(400).json({ message: 'Invalid user ID.' });
+    }
+
+    const filter = userId ? { userId: new mongoose.Types.ObjectId(userId) } : {};
 
     const orders = await Order.find(filter).sort({ createdAt: -1 }).lean();
 
@@ -164,7 +188,12 @@ app.patch('/api/orders/:id/status', async (req, res) => {
       return res.status(400).json({ message: 'Invalid status.' });
     }
 
-    const order = await Order.findByIdAndUpdate(req.params.id, { status }, { new: true });
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: 'Invalid order ID.' });
+    }
+
+    const orderId = new mongoose.Types.ObjectId(req.params.id);
+    const order = await Order.findByIdAndUpdate(orderId, { status }, { new: true });
     if (!order) {
       return res.status(404).json({ message: 'Order not found.' });
     }
@@ -177,7 +206,12 @@ app.patch('/api/orders/:id/status', async (req, res) => {
 
 app.delete('/api/orders/:id', async (req, res) => {
   try {
-    const deleted = await Order.findByIdAndDelete(req.params.id);
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: 'Invalid order ID.' });
+    }
+
+    const orderId = new mongoose.Types.ObjectId(req.params.id);
+    const deleted = await Order.findByIdAndDelete(orderId);
     if (!deleted) {
       return res.status(404).json({ message: 'Order not found.' });
     }

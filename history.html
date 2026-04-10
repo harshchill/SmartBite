@@ -70,9 +70,17 @@ return;
 let html="";
 
 orders.forEach(o=>{
+const formattedDate = new Date(o.date).toLocaleString("en-IN", {
+year: "numeric",
+month: "short",
+day: "2-digit",
+hour: "2-digit",
+minute: "2-digit"
+});
+
 html += `
 <div class="order">
-<b>${o.name}</b> — ${new Date(o.date).toLocaleString()}
+<b>${o.name}</b> — ${formattedDate}
 <p>📱 ${o.mobile}</p>
 <p>📍 ${o.address}</p>
 <p>Items: ${o.items.length}</p>

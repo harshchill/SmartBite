@@ -19,20 +19,38 @@ orders.forEach((order) => {
     statusBtn.innerText = "Mark Delivered";
 
     statusBtn.onclick = async function(){
-        await fetch(`/api/orders/${order.id}/status`, {
-            method: "PATCH",
-            headers: {"Content-Type": "application/json"},
-            body: JSON.stringify({ status: "Delivered" })
-        });
-        loadOrders();
+        try{
+            const response = await fetch(`/api/orders/${order.id}/status`, {
+                method: "PATCH",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({ status: "Delivered" })
+            });
+
+            if(!response.ok){
+                alert("Unable to update order status");
+                return;
+            }
+
+            loadOrders();
+        }catch(error){
+            alert("Unable to connect to server");
+        }
     };
 
     let deleteBtn = document.createElement("button");
     deleteBtn.innerText = "Delete";
 
     deleteBtn.onclick = async function(){
-        await fetch(`/api/orders/${order.id}`, { method: "DELETE" });
-        loadOrders();
+        try{
+            const response = await fetch(`/api/orders/${order.id}`, { method: "DELETE" });
+            if(!response.ok){
+                alert("Unable to delete order");
+                return;
+            }
+            loadOrders();
+        }catch(error){
+            alert("Unable to connect to server");
+        }
     };
 
     actionCell.appendChild(statusBtn);
@@ -42,12 +60,13 @@ orders.forEach((order) => {
 
 async function loadOrders(){
 const response = await fetch("/api/orders");
-const orders = await response.json();
 
 if(!response.ok){
     alert("Unable to load orders");
     return;
 }
+
+const orders = await response.json();
 
 renderOrders(orders);
 }
